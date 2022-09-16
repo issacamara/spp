@@ -17,17 +17,28 @@ import time
 from sklearn.preprocessing import MinMaxScaler 
 import config as conf
 from tensorflow import keras
+import os
 
 
 today = date.today()
 delta = timedelta(days=2)
 symbol = 'GOOG'
-def forecast(stock_data, nb_days):
+
+path_to_models = conf.home_path+conf.models_path
+
+symbols = [s for s in os.listdir(path_to_models) if s != '.DS_Store']
+
+models = {}
+
+for s in symbols:
+    models[s] = keras.models.load_model(path_to_models + s)
+
+def forecast(symbol, stock_data, nb_days):
     # yesterday = date.today() - timedelta(days=1)
     # end = yesterday.strftime('%Y-%m-%d')
     # start= (yesterday - timedelta(days=30)).strftime('%Y-%m-%d')
     # stock_data = yf.download(symbol, start=start, end=end)
-    model = keras.models.load_model(conf.home_path + conf.models_path)
+    model = models[symbol]
     
     scaler = MinMaxScaler(feature_range=(0,1))
     

@@ -10,19 +10,20 @@ import os
 import pandas as pd
 import numpy as np
 import yfinance as yf
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler 
 import math
 from tensorflow import keras
 from tensorflow.keras.layers import LSTM, Dropout, Dense
+import config as conf
 
 
 start = '2012-01-01'
 end = '2022-08-01'
-symbol = 'GOOG'
+symbol = 'TSLA'
 offset = 30
 batch_size = 32
-epochs = 4
+epochs = 3
 scaler = MinMaxScaler(feature_range=(0,1))
 
 def train_test_split(data,train_size):
@@ -39,8 +40,6 @@ def train_test_split(data,train_size):
 
     x_train, y_train = np.array(x_train), np.array(y_train)
     x_train = np.reshape(x_train, (x_train.shape[0], x_train.shape[1], 1))
-
-    test_data = data[training_data_len-offset: , : ]
 
     x_test = []
     y_test = data[training_data_len:]
@@ -72,8 +71,10 @@ def train(symbol, start, end, offset, batch_size, epochs, scaler):
 
     model.compile(optimizer='adam', loss='mean_squared_error')
     model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs)
+    
+    
+     
+    model.save(conf.home_path + conf.models_path + symbol)
 
-    model_json = model.to_json()
-    with open("model.json", "w") as json_file:
-        json_file.write(model_json)
 
+train(symbol, start, end, offset, batch_size, epochs, scaler)
