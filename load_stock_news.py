@@ -1,5 +1,3 @@
-from typing import Any
-
 from sqlalchemy import Column, Integer, String, DateTime, create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import Session
@@ -9,6 +7,8 @@ import requests
 import pandas as pd
 import time
 import logging
+import multiprocessing
+from joblib import Parallel, delayed
 
 start = time.time()
 Base = declarative_base()
@@ -26,7 +26,8 @@ class StockNews(Base):
     date = Column(DateTime)
 
 
-def scrape_google_finance(ticker: str, exchange: str):
+def scrape_google_finance(ticker: str, exchange: str, date):
+
     params = {
         "hl": "en"  # language
     }
@@ -39,29 +40,28 @@ def scrape_google_finance(ticker: str, exchange: str):
                         timeout=30)
     soup = BeautifulSoup(page.content, 'html.parser')
     news_set = soup.find_all("div", {"class": "Yfwt5"})
-    news = [n.contents[0] for n in news_set]
-    return news
+    news_list = [n.contents[0] for n in news_set]
+    news = ''.join(news_list)
+    # return StockNews(ticker=ticker, exchange=exchange, news=bytes(news, 'utf8'), date=date)
+    return ticker, exchange, news, date
 
 
 def main():
     tickers = pd.read_csv('tickers.csv', sep=';')
-    stocks = tickers[tickers['Market Cap'] > 5000000000][['Symbol', 'Exchange']].head().values
-    items = []
+    stocks = tickers[tickers['Market Cap'] > 5000000000][['Symbol', 'Exchange']].values
+
     date = dt.datetime.now()
-    for stock in stocks:
-        ticker = stock[0]
-        exchange = stock[1]
-        # logger.info(ticker, exchange, 'Downloading news ...')
-        news = ''.join(scrape_google_finance(ticker, exchange))
-        stock = StockNews(ticker=ticker, exchange=exchange, news=bytes(news, 'utf8'), date=date)
-        time.sleep(0.05)
-        items.append(stock)
+    num_cores = multiprocessing.cpu_count()
+    results = Parallel(n_jobs=num_cores)(delayed(scrape_google_finance)(stock[0], stock[1], date) for stock in stocks)
+    items = [StockNews(ticker=t, exchange=e, news=bytes(n, 'utf8'), date=d) for t, e, n, d in results]
+
 
     # sppapp12345@gmail.com spp1234@
+
     db = 'spp'
     host: str = 'localhost'
-    pwd = 'root1234'
     user = 'root'
+    pwd = 'root1234'
     port = 3306
     dialect = 'mysql'
     driver = 'pymysql'
@@ -70,10 +70,11 @@ def main():
                            .format(dialect=dialect, driver=driver, user=user, host=host, pwd=pwd, db=db, port=port))
     session = Session(engine)
     session.add_all(items)
-    # session.commit()
+    session.commit()
     session.close()
     end = time.time()
-    logging.info('Table successfully loaded !')
+    size = len(items)
+    logging.info(f'Table successfully loaded with {size} records')
     logging.info(str(dt.timedelta(seconds=(end - start))))
 
 
