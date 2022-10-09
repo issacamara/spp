@@ -8,4 +8,4 @@ Created on Sun Sep 11 15:01:34 2022
 
 home_path = '/Users/issacamara/Developer/StockPricePredictor/spp-app/'
 models_path = 'models/'
-offset = 30
+offset = 20

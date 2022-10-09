@@ -5,23 +5,21 @@ Created on Sun Sep 11 17:14:25 2022
 
 @author: issacamara
 """
-import math
-import yfinance as yf
+
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import MinMaxScaler
-import matplotlib.pyplot as plt
-import tensorflow as tf
-from datetime import datetime, timedelta, date
-import time
+from datetime import  timedelta, date
 from sklearn.preprocessing import MinMaxScaler
 import config as conf
 from tensorflow import keras
 import os
 
+
+
 today = date.today()
 delta = timedelta(days=2)
 symbol = 'GOOG'
+offset = conf.offset
 
 path_to_models = conf.models_path
 
@@ -31,6 +29,13 @@ models = {}
 
 for s in symbols:
     models[s] = keras.models.load_model(path_to_models + s)
+
+
+# Computes predictors from data up to i-th item, i must be greater than offset
+def get_predictors(data, i):
+    prev = data[i - offset:i, 0]
+    position = 1
+    return np.insert(prev, position, np.mean(prev))
 
 
 def forecast(symbol, stock_data, nb_days):
@@ -53,8 +58,9 @@ def forecast(symbol, stock_data, nb_days):
     last_day = max(stock_data.index)
     for i in range(nb_days):
         l = new_data.shape[0]
-        x_forecast = np.array([new_data[l - offset:l, 0]])
-        x_forecast = np.reshape(x_forecast, (x_forecast.shape[0], x_forecast.shape[1], 1))
+        x_forecast = np.array(get_predictors(new_data, l))
+        # x_forecast = np.array([new_data[l - offset:l, 0]])
+        x_forecast = np.reshape(x_forecast, (1, x_forecast.shape[0], 1))
         forecast = model.predict(x_forecast)
         new_data = np.append(new_data, forecast[0]).reshape(-1, 1)
         forecast = scaler.inverse_transform(forecast)
@@ -64,3 +70,7 @@ def forecast(symbol, stock_data, nb_days):
 
     df.index.names = ['Date']
     return df
+
+
+
+# scrape_google_finance(ticker="GOOGL:NASDAQ")

@@ -16,13 +16,14 @@ import math
 from tensorflow import keras
 from tensorflow.keras.layers import LSTM, Dropout, Dense
 import config as conf
+import helper as h
 
-start = '2012-01-01'
-end = '2022-08-01'
-symbol = 'TSLA'
-offset = 30
+start_date = '2022-01-01'
+end_date = '2022-08-01'
+symbol = 'GOOG'
+offset = conf.offset
 batch_size = 32
-epochs = 3
+epochs = 4
 scaler = MinMaxScaler(feature_range=(0, 1))
 
 
@@ -35,7 +36,7 @@ def train_test_split(data, train_size):
     y_train = []
 
     for i in range(offset, training_data_len):
-        x_train.append(train_data[i - offset:i, 0])
+        x_train.append(h.get_predictors(train_data,i))
         y_train.append(train_data[i, 0])
 
     x_train, y_train = np.array(x_train), np.array(y_train)
@@ -53,8 +54,7 @@ def train_test_split(data, train_size):
 
 
 def train(symbol, start, end, offset, batch_size, epochs, scaler):
-    stock_data = yf.download(symbol, start=start, end=end)
-
+    stock_data = yf.download(symbol, start, end)
     values = stock_data['Close'].values
 
     scaled_data = scaler.fit_transform(values.reshape(-1, 1))
@@ -75,4 +75,4 @@ def train(symbol, start, end, offset, batch_size, epochs, scaler):
     model.save(conf.models_path + symbol)
 
 
-train(symbol, start, end, offset, batch_size, epochs, scaler)
+train(symbol, start_date, end_date, offset, batch_size, epochs, scaler)

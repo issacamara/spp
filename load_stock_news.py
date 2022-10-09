@@ -6,8 +6,14 @@ from sqlalchemy.orm import Session
 import datetime as dt
 from bs4 import BeautifulSoup
 import requests
+import pandas as pd
+import time
+import logging
 
+start = time.time()
 Base = declarative_base()
+# logger = logging.getLogger('Stock News Logger')
+logging.basicConfig(level=logging.INFO)
 
 
 class StockNews(Base):
@@ -15,7 +21,6 @@ class StockNews(Base):
 
     id = Column(Integer, primary_key=True)  # obligatory
     ticker = Column(String)
-    company = Column(String)
     exchange = Column(String)
     news = Column(String)
     date = Column(DateTime)
@@ -38,28 +43,39 @@ def scrape_google_finance(ticker: str, exchange: str):
     return news
 
 
-stocks = [('GOOG', 'GOOGLE'), ('AAPL', 'APPLE'), ('TSLA', 'TESLA')]
-exchange = 'NASDAQ'
-date = dt.datetime.now()
-items = []
-for (ticker, company) in stocks:
-    news = ''.join(scrape_google_finance(ticker, exchange))
-    stock = StockNews(ticker=ticker, company=company, exchange=exchange, news=bytes(news, 'utf8'), date=date)
-    items.append(stock)
+def main():
+    tickers = pd.read_csv('tickers.csv', sep=';')
+    stocks = tickers[tickers['Market Cap'] > 5000000000][['Symbol', 'Exchange']].head().values
+    items = []
+    date = dt.datetime.now()
+    for stock in stocks:
+        ticker = stock[0]
+        exchange = stock[1]
+        # logger.info(ticker, exchange, 'Downloading news ...')
+        news = ''.join(scrape_google_finance(ticker, exchange))
+        stock = StockNews(ticker=ticker, exchange=exchange, news=bytes(news, 'utf8'), date=date)
+        time.sleep(0.05)
+        items.append(stock)
 
-db = 'spp'
-host: str = 'localhost'
-pwd = 'root1234'
-user = 'root'
-port = 3306
-dialect = 'mysql'
-driver = 'pymysql'
+    # sppapp12345@gmail.com spp1234@
+    db = 'spp'
+    host: str = 'localhost'
+    pwd = 'root1234'
+    user = 'root'
+    port = 3306
+    dialect = 'mysql'
+    driver = 'pymysql'
 
-engine = create_engine("{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}" \
-                       .format(dialect=dialect, driver=driver, user=user, host=host, pwd=pwd, db=db, port=port))
+    engine = create_engine("{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}" \
+                           .format(dialect=dialect, driver=driver, user=user, host=host, pwd=pwd, db=db, port=port))
+    session = Session(engine)
+    session.add_all(items)
+    # session.commit()
+    session.close()
+    end = time.time()
+    logging.info('Table successfully loaded !')
+    logging.info(str(dt.timedelta(seconds=(end - start))))
 
-session = Session(engine)
-session.add_all(items)
-session.commit()
-session.close()
-print('Table successfully loaded !')
+
+if __name__ == "__main__":
+    main()
