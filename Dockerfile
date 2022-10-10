@@ -4,6 +4,8 @@ EXPOSE 8501
 
 WORKDIR /spp-app
 
+COPY configuration.yml .
+
 COPY *py .
 
 COPY Dockerfile .

@@ -1,0 +1,16 @@
+app:
+  name: spp
+log:
+  level: INFO
+
+database:
+  name: spp
+#  username: ${DATABASE_USERNAME}
+  username: ${{HOME}}
+  password: ${DATABASE_PASSWORD}
+  host: localhost
+  port: 3306
+  dialect: mysql
+  driver: pymysql
+
+

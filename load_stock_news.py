@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import Column, Integer, String, DateTime, create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import Session
@@ -9,6 +11,9 @@ import time
 import logging
 import multiprocessing
 from joblib import Parallel, delayed
+import yaml
+
+
 
 start = time.time()
 Base = declarative_base()
@@ -58,20 +63,22 @@ def main():
 
     # sppapp12345@gmail.com spp1234@
 
-    db = 'spp'
-    host: str = 'localhost'
-    user = 'root'
-    pwd = 'root1234'
-    port = 3306
-    dialect = 'mysql'
-    driver = 'pymysql'
+    with open('configuration.yml') as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+        db = data['database']['name']
+        host: str = data['database']['host']
+        user = os.getenv('DATABASE_USERNAME', 'root')
+        pwd = os.getenv('DATABASE_PASSWORD', 'root1234')
+        port = data['database']['port']
+        dialect = data['database']['dialect']
+        driver = data['database']['driver']
 
-    engine = create_engine("{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}" \
-                           .format(dialect=dialect, driver=driver, user=user, host=host, pwd=pwd, db=db, port=port))
-    session = Session(engine)
-    session.add_all(items)
-    session.commit()
-    session.close()
+        engine = create_engine("{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}" \
+                               .format(dialect=dialect, driver=driver, user=user, host=host, pwd=pwd, db=db, port=port))
+        session = Session(engine)
+        session.add_all(items)
+        session.commit()
+        session.close()
     end = time.time()
     size = len(items)
     logging.info(f'Table successfully loaded with {size} records')
