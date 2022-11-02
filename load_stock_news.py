@@ -13,8 +13,6 @@ import multiprocessing
 from joblib import Parallel, delayed
 import yaml
 
-
-
 start = time.time()
 Base = declarative_base()
 # logger = logging.getLogger('Stock News Logger')
@@ -31,8 +29,7 @@ class StockNews(Base):
     date = Column(DateTime)
 
 
-def scrape_google_finance(ticker: str, exchange: str, date):
-
+def scrape_google_finance(ticker: str, exchange: str):
     params = {
         "hl": "en"  # language
     }
@@ -48,25 +45,24 @@ def scrape_google_finance(ticker: str, exchange: str, date):
     news_list = [n.contents[0] for n in news_set]
     news = ''.join(news_list)
     # return StockNews(ticker=ticker, exchange=exchange, news=bytes(news, 'utf8'), date=date)
-    return ticker, exchange, news, date
+    return ticker, exchange, news
 
 
 def main():
     tickers = pd.read_csv('tickers.csv', sep=';')
-    stocks = tickers[tickers['Market Cap'] > 5000000000][['Symbol', 'Exchange']].values
+    stocks = tickers[['Symbol', 'Exchange']].values
 
     date = dt.datetime.now()
     num_cores = multiprocessing.cpu_count()
-    results = Parallel(n_jobs=num_cores)(delayed(scrape_google_finance)(stock[0], stock[1], date) for stock in stocks)
-    items = [StockNews(ticker=t, exchange=e, news=bytes(n, 'utf8'), date=d) for t, e, n, d in results]
-
+    results = Parallel(n_jobs=num_cores)(delayed(scrape_google_finance)(stock[0], stock[1]) for stock in stocks)
+    items = [StockNews(ticker=t, exchange=e, news=bytes(n, 'utf8'), date=date) for t, e, n in results]
 
     # sppapp12345@gmail.com spp1234@
 
     with open('configuration.yml') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
         db = data['database']['name']
-        host: str = data['database']['host']
+        host: str = os.getenv('DATABASE_HOST', 'localhost')
         user = os.getenv('DATABASE_USERNAME', 'root')
         pwd = os.getenv('DATABASE_PASSWORD', 'root1234')
         port = data['database']['port']

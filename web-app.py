@@ -31,7 +31,7 @@ sidebar.write('Stock Settings')
 stock = sidebar.selectbox('Select a stock', ('GOOG', 'AAPL', 'TSLA'))
 temporality = sidebar.selectbox('Select the temporality', ('Minute', 'Day'))
 # sidebar.write('You selected:', stock)
-st.markdown("<h1 style='text-align: center; color: red;'>{} Stock Prices </h1>".format(stock),
+st.markdown(f"<h1 style='text-align: center; color: red;'>{stock} Stock Prices </h1>",
             unsafe_allow_html=True)
 
 col1, col2 = sidebar.columns(2, gap='medium')

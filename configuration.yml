@@ -8,7 +8,7 @@ database:
 #  username: ${DATABASE_USERNAME}
   username: ${{HOME}}
   password: ${DATABASE_PASSWORD}
-  host: localhost
+  host: ${DATABASE_HOST}
   port: 3306
   dialect: mysql
   driver: pymysql
