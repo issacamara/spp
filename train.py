@@ -18,6 +18,7 @@ from tensorflow.keras.layers import LSTM, Dropout, Dense
 import config as conf
 import helper as h
 
+
 start_date = '2022-01-01'
 end_date = '2022-08-01'
 symbol = 'GOOG'
@@ -55,6 +56,7 @@ def train_test_split(data, train_size):
 
 def train(symbol, start, end, offset, batch_size, epochs, scaler):
     stock_data = yf.download(symbol, start, end)
+    stock_data = h.get_stock_news(symbol, start, end)
     values = stock_data['Close'].values
 
     scaled_data = scaler.fit_transform(values.reshape(-1, 1))
@@ -75,4 +77,4 @@ def train(symbol, start, end, offset, batch_size, epochs, scaler):
     model.save(conf.models_path + symbol)
 
 
-train(symbol, start_date, end_date, offset, batch_size, epochs, scaler)
+# train(symbol, start_date, end_date, offset, batch_size, epochs, scaler)

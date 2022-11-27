@@ -14,19 +14,10 @@ from joblib import Parallel, delayed
 import yaml
 
 start = time.time()
-Base = declarative_base()
 # logger = logging.getLogger('Stock News Logger')
 logging.basicConfig(level=logging.INFO)
 
-
-class StockNews(Base):
-    __tablename__ = 'stock_news'  # if you use base it is obligatory
-
-    id = Column(Integer, primary_key=True)  # obligatory
-    ticker = Column(String)
-    exchange = Column(String)
-    news = Column(String)
-    date = Column(DateTime)
+from helper import StockNews
 
 
 def scrape_google_finance(ticker: str, exchange: str):
@@ -63,8 +54,11 @@ def main():
         data = yaml.load(f, Loader=yaml.FullLoader)
         db = data['database']['name']
         host: str = os.getenv('DATABASE_HOST', 'localhost')
+        # ec2-54-93-89-186.eu-central-1.compute.amazonaws.com
         user = os.getenv('DATABASE_USERNAME', 'root')
+        # issa
         pwd = os.getenv('DATABASE_PASSWORD', 'root1234')
+        # Iss4K4m001?
         port = data['database']['port']
         dialect = data['database']['dialect']
         driver = data['database']['driver']

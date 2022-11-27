@@ -15,7 +15,9 @@ from dateutil.relativedelta import relativedelta  # to add days or years
 
 # model = keras.models.load_model(conf.home_path + conf.models_path)
 
-st.title('Stock Price Prediction')
+title = 'Stock Price Prediction'
+st.markdown(f"<h1 style='text-align: center; color: black;'>{title}</h1>", unsafe_allow_html=True)
+# st.title('Stock Price Prediction')
 
 hide_st_style = ("<style>"
                  # + "#MainMenu {visibility: hidden;}" 
@@ -28,11 +30,26 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 
 sidebar = st.sidebar
 sidebar.write('Stock Settings')
-stock = sidebar.selectbox('Select a stock', ('GOOG', 'AAPL', 'TSLA'))
-temporality = sidebar.selectbox('Select the temporality', ('Minute', 'Day'))
+tickers = list(pd.read_csv('tickers.csv', sep=';')['Symbol'])
+
+stock = sidebar.selectbox('Select a stock', tickers)
+# temporality = sidebar.selectbox('Select the temporality', ('Minute', 'Day'))
 # sidebar.write('You selected:', stock)
 st.markdown(f"<h1 style='text-align: center; color: red;'>{stock} Stock Prices </h1>",
             unsafe_allow_html=True)
+############################################### TABS ###############################################
+title1 = "History"
+title2 = "Forecast"
+# history_tab, forecast_tab = st.tabs([title1, title2])
+#
+# with history_tab:
+#    st.header(title1)
+#
+# with forecast_tab:
+#    st.header(title2)
+
+history_chart, forecast_chart = st.columns(2, gap='medium')
+############################################### SIDEBAR ###############################################
 
 col1, col2 = sidebar.columns(2, gap='medium')
 d1 = col1.date_input("From", dt.date(2016, 7, 6))
@@ -47,18 +64,23 @@ slider = sidebar.slider('Select a range', min_value=start_date, value=end_date, 
 
 _, col, _ = sidebar.columns(3, gap='small')
 
+
+# st.write(investment)
+st.markdown(f"<h1 style='text-align: center; color: blue;'>{investment} </h1>",
+            unsafe_allow_html=True)
 if col.button('Forecast'):
     start = start_date.strftime(format2)
     end = end_date.strftime(format2)
     stock_data = yf.download(stock, start=start, end=end)
 
-    st.write('Stock Prices between', start, 'and', end)
+    # st.write('Stock Prices between', start, 'and', end)
 
     # st.line_chart(stock_data['Close'])
     predictions = helper.forecast(stock, stock_data, 60)
     df = pd.merge(left=stock_data, right=predictions, how='outer',
                   left_on='Date', right_on='Date')
     df = df.rename(columns={"Close_x": "Actual", "Close_y": "Prediction"})
-    st.line_chart(df[['Actual', 'Prediction']])
-else:
-    st.write('Goodbye')
+    history_chart.line_chart(df[['Actual']])
+    forecast_chart.line_chart(df[['Prediction']])
+
+

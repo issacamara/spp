@@ -5,15 +5,46 @@ Created on Sun Sep 11 17:14:25 2022
 
 @author: issacamara
 """
-
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-from datetime import  timedelta, date
+from datetime import timedelta, date
+
 from sklearn.preprocessing import MinMaxScaler
 import config as conf
 from tensorflow import keras
 import os
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, text
+import yaml
+import yfinance as yf
+import multiprocessing
+from joblib import Parallel, delayed
 
+Base = declarative_base()
+
+
+class StockNews(Base):
+    __tablename__ = 'stock_news'  # if you use base it is obligatory
+
+    id = Column(Integer, primary_key=True)  # obligatory
+    ticker = Column(String)
+    exchange = Column(String)
+    news = Column(String)
+    date = Column(DateTime)
+
+    def __repr__(self):
+        return f"<Stock(id='{self.id}', ticker='{self.ticker}', exchange='{self.exchange}, " \
+               f"news='{self.news}', date='{self.date}')>"
+
+
+@dataclass
+class Stock():
+    ticker: str
+    exchange: str
+    news: str
+    date: str
+    price: float
 
 
 today = date.today()
@@ -43,7 +74,7 @@ def forecast(symbol, stock_data, nb_days):
     # end = yesterday.strftime('%Y-%m-%d')
     # start= (yesterday - timedelta(days=30)).strftime('%Y-%m-%d')
     # stock_data = yf.download(symbol, start=start, end=end)
-    model = models[symbol]
+    model = models.get(symbol, models.get('GOOG'))
 
     scaler = MinMaxScaler(feature_range=(0, 1))
 
@@ -72,5 +103,92 @@ def forecast(symbol, stock_data, nb_days):
     return df
 
 
+def get_stock_news(ticker, start, end):
+    with open('configuration.yml') as f:
+        yml = yaml.load(f, Loader=yaml.FullLoader)
+        db = yml['database']['name']
+        host: str = yml['database']['host']
+        user = yml['database']['username']
+        pwd = yml['database']['password']
+        port = yml['database']['port']
+        dialect = yml['database']['dialect']
+        driver = yml['database']['driver']
+        engine = create_engine(f"{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}")
+
+        # session = Session(engine)
+
+        # stocks = session.query(StockNews)\
+        #                  .filter(StockNews.date.between(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')))\
+        #                  .filter(StockNews.ticker == ticker)
+        sql = text(f"""select * from spp.stock_news 
+                        where ticker='{ticker}' and date between '{start.strftime('%Y-%m-%d')}' 
+                            and '{end.strftime('%Y-%m-%d')}' 
+                        """)
+        # and ticker = '{ticker}'
+        stocks = engine.execute(sql)
+
+        data = [(s.ticker, s.exchange, s.news, s.date.strftime('%Y-%m-%d')) for s in stocks]
+        df = pd.DataFrame(data, columns=['Ticker', 'Exchange', 'News', 'Date'])
+        res = df.groupby(['Ticker', 'Date']).agg({'News': lambda x: ' , '.join(set(x.dropna()))}).reset_index()
+
+        stock_prices = yf.download(symbol, start=start, end=end).reset_index()[['Date', 'Close']]
+        stock_prices['Date'] = stock_prices['Date'].astype(str)
+        stock_prices['Ticker'] = ticker
+        res = pd.merge(res, stock_prices, how='inner', left_on=['Date', 'Ticker'], right_on=['Date', 'Ticker'])
+        # res['Ticker'] = ticker
+
+        return res
+
+
+def get_all_stock_news(start, end):
+    with open('configuration.yml') as f:
+        yml = yaml.load(f, Loader=yaml.FullLoader)
+        db = yml['database']['name']
+        host: str = yml['database']['host']
+        user = yml['database']['username']
+        pwd = yml['database']['password']
+        port = yml['database']['port']
+        dialect = yml['database']['dialect']
+        driver = yml['database']['driver']
+        engine = create_engine(f"{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}")
+
+        # session = Session(engine)
+
+        # stocks = session.query(StockNews)\
+        #                  .filter(StockNews.date.between(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')))\
+        #                  .filter(StockNews.ticker == ticker)
+        sql = text(f"""select * from spp.stock_news 
+                        where date between '{start.strftime('%Y-%m-%d')}' and '{end.strftime('%Y-%m-%d')}' 
+                        """)
+        # and ticker = '{ticker}'
+        stocks = engine.execute(sql)
+
+        data = [(s.ticker, s.exchange, s.news, s.date.strftime('%Y-%m-%d')) for s in stocks]
+        df = pd.DataFrame(data, columns=['Ticker', 'Exchange', 'News', 'Date'])
+        res = df.groupby(['Ticker', 'Date']).agg({'News': lambda x: ' , '.join(set(x.dropna()))}).reset_index()
+        # session.close()
+        num_cores = int(multiprocessing.cpu_count())
+
+        tickers = pd.read_csv('tickers.csv', sep=';')['Symbol'].values
+
+        def custom_download(sym, s, e):
+            df = yf.download(sym, s, e).reset_index()
+            df['Ticker'] = sym
+            return df[['Date', 'Ticker', 'Close']]
+
+        results = Parallel(n_jobs=num_cores)(delayed(custom_download)(t, start, end) for t in tickers)
+        stock_prices = pd.concat(results, axis=0)
+
+        # stock_prices = yf.download(symbol, start=start, end=end).reset_index()[['Date', 'Close']]
+        stock_prices['Date'] = stock_prices['Date'].astype(str)
+        res = pd.merge(res, stock_prices, how='inner', left_on=['Date', 'Ticker'], right_on=['Date', 'Ticker'])
+        # res['Ticker'] = ticker
+
+        return res
+
+start = date(2022, 11, 16)
+end = date(2022, 11, 17)
+# print('Done')
+data = get_stock_news('TSLA',start, end)
 
 # scrape_google_finance(ticker="GOOGL:NASDAQ")
