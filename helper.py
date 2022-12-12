@@ -5,21 +5,21 @@ Created on Sun Sep 11 17:14:25 2022
 
 @author: issacamara
 """
+import multiprocessing
+import os
 from dataclasses import dataclass
-import numpy as np
-import pandas as pd
 from datetime import timedelta, date
 
-from sklearn.preprocessing import MinMaxScaler
-import config as conf
-from tensorflow import keras
-import os
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import Column, Integer, String, DateTime, create_engine, text
-import yaml
+import numpy as np
+import pandas as pd
 import yfinance as yf
-import multiprocessing
 from joblib import Parallel, delayed
+from sklearn.preprocessing import MinMaxScaler
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, text
+from sqlalchemy.orm import declarative_base
+from tensorflow import keras
+
+import config as conf
 
 Base = declarative_base()
 
@@ -62,6 +62,8 @@ for s in symbols:
     models[s] = keras.models.load_model(path_to_models + s)
 
 print("Write this everytime it runs -- Helper")
+
+
 # Computes predictors from data up to i-th item, i must be greater than offset
 def get_predictors(data, i):
     prev = data[i - offset:i, 0]
@@ -69,12 +71,12 @@ def get_predictors(data, i):
     return np.insert(prev, position, np.mean(prev))
 
 
-def forecast(symbol, stock_data, nb_days):
+def forecast(ticker, stock_data, nb_days):
     # yesterday = date.today() - timedelta(days=1)
     # end = yesterday.strftime('%Y-%m-%d')
     # start= (yesterday - timedelta(days=30)).strftime('%Y-%m-%d')
     # stock_data = yf.download(symbol, start=start, end=end)
-    model = models.get(symbol, models.get('GOOG'))
+    model = models.get(ticker, models.get('GOOG'))
 
     scaler = MinMaxScaler(feature_range=(0, 1))
 
@@ -103,87 +105,83 @@ def forecast(symbol, stock_data, nb_days):
     return df
 
 
-def get_stock_news(ticker, start, end):
-    with open('configuration.yml') as f:
-        yml = yaml.load(f, Loader=yaml.FullLoader)
-        db = yml['database']['name']
-        host: str = yml['database']['host']
-        user = yml['database']['username']
-        pwd = yml['database']['password']
-        port = yml['database']['port']
-        dialect = yml['database']['dialect']
-        driver = yml['database']['driver']
-        engine = create_engine(f"{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}")
+def get_stock_news(st, ticker, start, end):
+    db_name = "spp"
+    host: str = st.secrets["db_hostname"]
+    user = st.secrets["username"]
+    pwd = st.secrets['db_password']
+    port = 3306
+    dialect = "mysql"
+    driver = "pymysql"
+    engine = create_engine(f"{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db_name}")
 
-        # session = Session(engine)
+    # session = Session(engine)
 
-        # stocks = session.query(StockNews)\
-        #                  .filter(StockNews.date.between(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')))\
-        #                  .filter(StockNews.ticker == ticker)
-        sql = text(f"""select * from spp.stock_news 
-                        where ticker='{ticker}' and date between '{start.strftime('%Y-%m-%d')}' 
-                            and '{end.strftime('%Y-%m-%d')}' 
-                        """)
-        # and ticker = '{ticker}'
-        stocks = engine.execute(sql)
+    # stocks = session.query(StockNews)\
+    #                  .filter(StockNews.date.between(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')))\
+    #                  .filter(StockNews.ticker == ticker)
+    sql = text(f"""select * from spp.stock_news 
+                    where ticker='{ticker}' and date between '{start.strftime('%Y-%m-%d')}' 
+                        and '{end.strftime('%Y-%m-%d')}' 
+                    """)
+    # and ticker = '{ticker}'
+    stocks = engine.execute(sql)
 
-        data = [(s.ticker, s.exchange, s.news, s.date.strftime('%Y-%m-%d')) for s in stocks]
-        df = pd.DataFrame(data, columns=['Ticker', 'Exchange', 'News', 'Date'])
-        res = df.groupby(['Ticker', 'Date']).agg({'News': lambda x: ' , '.join(set(x.dropna()))}).reset_index()
+    data = [(s.ticker, s.exchange, s.news, s.date.strftime('%Y-%m-%d')) for s in stocks]
+    df = pd.DataFrame(data, columns=['Ticker', 'Exchange', 'News', 'Date'])
+    res = df.groupby(['Ticker', 'Date']).agg({'News': lambda x: ' , '.join(set(x.dropna()))}).reset_index()
 
-        stock_prices = yf.download(symbol, start=start, end=end).reset_index()
-        stock_prices['Date'] = stock_prices['Date'].astype(str)
-        stock_prices['Ticker'] = ticker
-        res = pd.merge(res, stock_prices, how='inner', left_on=['Date', 'Ticker'], right_on=['Date', 'Ticker'])
-        # res['Ticker'] = ticker
+    stock_prices = yf.download(symbol, start=start, end=end).reset_index()
+    stock_prices['Date'] = stock_prices['Date'].astype(str)
+    stock_prices['Ticker'] = ticker
+    res = pd.merge(res, stock_prices, how='inner', left_on=['Date', 'Ticker'], right_on=['Date', 'Ticker'])
+    # res['Ticker'] = ticker
 
-        return res
+    return res
 
 
-def get_all_stock_news(start, end):
-    with open('configuration.yml') as f:
-        yml = yaml.load(f, Loader=yaml.FullLoader)
-        db = yml['database']['name']
-        host: str = yml['database']['host']
-        user = yml['database']['username']
-        pwd = yml['database']['password']
-        port = yml['database']['port']
-        dialect = yml['database']['dialect']
-        driver = yml['database']['driver']
-        engine = create_engine(f"{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db}")
+def get_all_stock_news(st, start, end):
+    db_name = "spp"
+    host: str = st.secrets["db_hostname"]
+    user = st.secrets["username"]
+    pwd = st.secrets['db_password']
+    port = 3306
+    dialect = "mysql"
+    driver = "pymysql"
+    engine = create_engine(f"{dialect}+{driver}://{user}:{pwd}@{host}:{port}/{db_name}")
 
-        # session = Session(engine)
+    # session = Session(engine)
 
-        # stocks = session.query(StockNews)\
-        #                  .filter(StockNews.date.between(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')))\
-        #                  .filter(StockNews.ticker == ticker)
-        sql = text(f"""select * from spp.stock_news 
-                        where date between '{start.strftime('%Y-%m-%d')}' and '{end.strftime('%Y-%m-%d')}' 
-                        """)
-        # and ticker = '{ticker}'
-        stocks = engine.execute(sql)
+    # stocks = session.query(StockNews)\
+    #                  .filter(StockNews.date.between(start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')))\
+    #                  .filter(StockNews.ticker == ticker)
+    sql = text(f"""select * from spp.stock_news 
+                    where date between '{start.strftime('%Y-%m-%d')}' and '{end.strftime('%Y-%m-%d')}' 
+                    """)
+    # and ticker = '{ticker}'
+    stocks = engine.execute(sql)
 
-        data = [(s.ticker, s.exchange, s.news, s.date.strftime('%Y-%m-%d')) for s in stocks]
-        df = pd.DataFrame(data, columns=['Ticker', 'Exchange', 'News', 'Date'])
-        res = df.groupby(['Ticker', 'Date']).agg({'News': lambda x: ' , '.join(set(x.dropna()))}).reset_index()
-        # session.close()
-        num_cores = int(multiprocessing.cpu_count())
+    data = [(s.ticker, s.exchange, s.news, s.date.strftime('%Y-%m-%d')) for s in stocks]
+    df = pd.DataFrame(data, columns=['Ticker', 'Exchange', 'News', 'Date'])
+    res = df.groupby(['Ticker', 'Date']).agg({'News': lambda x: ' , '.join(set(x.dropna()))}).reset_index()
+    # session.close()
+    num_cores = int(multiprocessing.cpu_count())
 
-        tickers = pd.read_csv('tickers.csv', sep=';')['Symbol'].values
+    tickers = pd.read_csv('tickers.csv', sep=';')['Symbol'].values
 
-        def custom_download(sym, s, e):
-            df = yf.download(sym, s, e).reset_index()
-            df['Ticker'] = sym
-            df['Date'] = df['Date'].astype(str)
-            return df
+    def custom_download(sym, s, e):
+        df = yf.download(sym, s, e).reset_index()
+        df['Ticker'] = sym
+        df['Date'] = df['Date'].astype(str)
+        return df
 
-        results = Parallel(n_jobs=num_cores)(delayed(custom_download)(t, start, end) for t in tickers)
-        stock_prices = pd.concat(results, axis=0)
+    results = Parallel(n_jobs=num_cores)(delayed(custom_download)(t, start, end) for t in tickers)
+    stock_prices = pd.concat(results, axis=0)
 
-        res = pd.merge(res, stock_prices, how='inner', left_on=['Date', 'Ticker'], right_on=['Date', 'Ticker'])
-        # res['Ticker'] = ticker
+    res = pd.merge(res, stock_prices, how='inner', left_on=['Date', 'Ticker'], right_on=['Date', 'Ticker'])
+    # res['Ticker'] = ticker
 
-        return res
+    return res
 
 
 def trading_indicators(df):
@@ -194,7 +192,6 @@ def trading_indicators(df):
     # EWMA
     df['EWMA30'] = df['Close'].ewm(span=30).mean()
 
-
     # Fibonacci Retracement
     price_min = df.Close.min()
     price_max = df.Close.max()
@@ -202,7 +199,6 @@ def trading_indicators(df):
     level1 = price_max - 0.236 * diff
     level2 = price_max - 0.382 * diff
     level3 = price_max - 0.618 * diff
-
 
 
 def stochastic_oscillator(df):
@@ -225,6 +221,7 @@ def macd(row):
     row['MACD'] = exp1 - exp2
     return row['MACD']
 
+
 def bollinger_bands(row):
     # Bollinger Bands
     row['TP'] = (row['Close'] + row['Low'] + row['High']) / 3
@@ -234,16 +231,18 @@ def bollinger_bands(row):
     row['BOLD'] = row['MA-TP'] - 2 * row['std']
     return row[['BOLU', 'BOLD']]
 
+
 def rsi(row):
     # RSI
-    delta = df['Close'].diff()
+    delta = row['Close'].diff()
     up = delta.clip(lower=0)
     down = -1 * delta.clip(upper=0)
     ema_up = up.ewm(com=13, adjust=False).mean()
     ema_down = down.ewm(com=13, adjust=False).mean()
     return ema_up / ema_down
 
-def atr(row):
+
+def atr(df):
     # Average True Range
     high_low = df['High'] - df['Low']
     high_close = np.abs(df['High'] - df['Close'].shift())

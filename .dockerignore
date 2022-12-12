@@ -6,3 +6,6 @@ README.md
 LICENSE
 .idea
 .DS_Store
+.env
+.venv
+__pycache__/

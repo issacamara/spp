@@ -11,6 +11,8 @@ import pandas as pd
 import datetime as dt
 import yfinance as yf
 import cufflinks as cf
+import os
+print('Value for USER is', st.secrets["db_hostname"])
 import helper
 from dateutil.relativedelta import relativedelta  # to add days or years
 

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+
+  spp:
+    ports:
+      - '9000:8501'
+    build: .
+    environment:
+      - USER=/run/secrets/spp_db_user
+      - HOST=/run/secrets/spp_db_host
+      - PASSWORD=/run/secrets/spp_db_pwd
+      - PORT=3306
+    secrets:
+      - spp_db_user
+      - spp_db_host
+      - spp_db_pwd
+
+secrets:
+   spp_db_host:
+     external: true
+   spp_db_user:
+     external: true
+   spp_db_pwd:
+     external: true
+
