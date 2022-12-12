@@ -1,0 +1,8 @@
+numpy
+tensorflow
+streamlit
+cufflinks
+sqlalchemy
+scikit-learn
+yfinance
+bs4
